@@ -2,7 +2,7 @@
 Project Author: Chukwuemeka L. Nkama
 Date: July 5, 2021
 
-prosths2.py is a python file that contains helper classes
+prosths.py is a python file that contains helper classes
 and methods for object detection and segmentation of human
 body parts...
 """
@@ -11,6 +11,7 @@ body parts...
 from ultralytics import YOLO
 import cv2
 import numpy as np
+import sys
 
 class Dseg():
 
@@ -32,7 +33,6 @@ class Dseg():
         self._img = cv2.imread(image_path)
         self._pred = None
         self._detect_flag = False 
-        self._segment_flag = False 
         self._obj_id = 41  # object id in model
         self._contours = []
         self._prob = None 
@@ -42,6 +42,10 @@ class Dseg():
             Detects objects in image based on
             YOLO
         """
+        if self._img is None:
+            print("Image could not be read!")
+            sys.exit()
+
         model = YOLO("yolov8m-seg.pt")
         preds = model.predict(image.copy())
         self._pred = preds[0]  # index 0th term since we have 1 img
@@ -56,11 +60,11 @@ class Dseg():
 
         if not self._detect_flag:
             print("ERROR: Call detect() first")
-            return
+            sys.exit()
 
         if len(self._pred.boxes) == 0:
             print("No contour found!")
-            return 
+            sys.exit() 
 
         counter = 0  # helps skip contours not of interest
         for each_segment in self._pred.masks.xyn:
@@ -78,7 +82,10 @@ class Dseg():
             self._prob = self._pred.boxes[counter].conf[0].item()
             counter += 1
         
-        self._segment_flag = True # contours were discovered
+        if len(self._contours) == 0:
+            print("Objects found by model but not what you want!")
+            sys.exit()
+        
         self.get_min_rectBox() # Get min. rect that surrounds the image
 
 
@@ -310,13 +317,11 @@ class Prosths(WidthVar):
         """
         self.detect(self._img) # detect object
         self.segment() # segment object 
-        if self._segment_flag:
-            # show contours and and widths if contour was detected
-            self.get_min_rectBox() # get min.area Rectangle 
-            self.get_rot_img() # get rotated image if min. Rect is rotated 
-            self.gen_suitable() # get suitable points/lines 
-            self.var_width() # get all the varying widths 
-            self.show()
+        self.get_min_rectBox() # get min.area Rectangle 
+        self.get_rot_img() # get rotated image if min. Rect is rotated 
+        self.gen_suitable() # get suitable points/lines 
+        self.var_width() # get all the varying widths 
+        self.show()
 
     def draw_minrect(self):
         """
@@ -427,5 +432,5 @@ class Prosths(WidthVar):
 
         
 
-a = Prosths('images/rot-cup.jpg')
+a = Prosths('images/cup5.jpg')
 a.run()
