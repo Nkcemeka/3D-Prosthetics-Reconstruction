@@ -1,8 +1,8 @@
 """
 Project Author: Chukwuemeka L. Nkama
-Date: July 5, 2023
+Date: July 5, 2021
 
-prosths.py is a python file that contains helper classes
+prosths2.py is a python file that contains helper classes
 and methods for object detection and segmentation of human
 body parts...
 """
@@ -11,7 +11,6 @@ body parts...
 from ultralytics import YOLO
 import cv2
 import numpy as np
-
 
 class Dseg():
 
@@ -32,19 +31,19 @@ class Dseg():
         """
         self._img = cv2.imread(image_path)
         self._pred = None
-        self._detect_flag = None
-        self._segment_flag = None
+        self._detect_flag = False 
+        self._segment_flag = False 
         self._obj_id = 41  # object id in model
         self._contours = []
-        self._boxes = None  # contains boxes of desired contours
+        self._prob = None 
 
-    def detect(self):
+    def detect(self, image):
         """
             Detects objects in image based on
             YOLO
         """
         model = YOLO("yolov8m-seg.pt")
-        preds = model.predict(self._img.copy())
+        preds = model.predict(image.copy())
         self._pred = preds[0]  # index 0th term since we have 1 img
         self._detect_flag = True
 
@@ -61,7 +60,7 @@ class Dseg():
 
         if len(self._pred.boxes) == 0:
             print("No contour found!")
-            return
+            return 
 
         counter = 0  # helps skip contours not of interest
         for each_segment in self._pred.masks.xyn:
@@ -75,9 +74,12 @@ class Dseg():
             contour = np.array(each_segment, dtype=np.intp)
             self._contours.append(contour)
 
-            if self._segment_flag is None:
-                self._segment_flag = True
+            # Take note of probability
+            self._prob = self._pred.boxes[counter].conf[0].item()
             counter += 1
+        
+        self._segment_flag = True # contours were discovered
+        self.get_min_rectBox() # Get min. rect that surrounds the image
 
 
 class MinRect(Dseg):
@@ -94,12 +96,13 @@ class MinRect(Dseg):
     def __init__(self, image_path):
         super().__init__(image_path)
         self._rotFlag = None  # checks if obj is rotated
-        self._rotCnts = None  # rotated contour
-        self._originRot = None  # top left corner of min rect
         self._minRectBox = None
         self._uvecs = None
-        self._transMat = None
-        self._maxyRot = None
+        self._rotAngle = None 
+        self._width = None
+        self._height = None 
+        self._center = None 
+        self._crot = None 
 
     def get_min_rectBox(self):
         """
@@ -107,16 +110,25 @@ class MinRect(Dseg):
             of the minimum area rect.
         """
         rect = cv2.minAreaRect(self._contours[0])  # select first object
+        self._center = rect[0] # center coordinates of rectangle 
 
         if np.absolute(rect[2]) == 90:
             self._rotFlag = False
         else:
             self._rotFlag = True
 
-        # print rectangle's angle of rotation
-        print(f'Rectangle\'s angle of rotation is: {rect[2]} degrees')
+        # Get the coords of the min. Area rect 
         rect_box = cv2.boxPoints(rect)
         self._minRectBox = np.intp(rect_box)
+
+        # Get width and height of rectangle
+        box = self._minRectBox.copy()
+        box = box[box[:,1].argsort()]  # sort the box array
+        self._width = np.linalg.norm(box[1] - box[0])
+        self._height = np.linalg.norm(box[3] - box[0])
+
+        # Get the unit vectors
+        self.uvec(self._minRectBox)
 
     def uvec(self, box):
         """
@@ -140,48 +152,64 @@ class MinRect(Dseg):
 
         # Get unit vectors for min. rect
         if box[1][0] < box[0][0]:  # rect is rot. left
-            self._originRot = box[1]  # select the origin
             box = -1 * box  # mult. by -1 to get uvec in right dirxns
             flip = True
+            self._crot = False  # rectangle was not rotated clockwise 
         else:
-            self._originRot = box[0]  # select origin
-
-        # Get the height coord of the rot.rect
-        self._maxyRot = np.absolute(box)[3][1]
+            self._crot = True # rectangle was rotated clockwise 
 
         # Get the first unit vector
         uvec1 = box[1] - box[0]
-        uvec1 = uvec1/ np.linalg.norm(uvec1)
+        uvec1 = uvec1 / np.linalg.norm(uvec1)
 
         # Get the second unit vector
         if flip:
             uvec2 = -box[3] + box[1]  # done since box was mult. by -1
-            uvec2 = uvec2/np.linalg.norm(uvec2)
+            uvec2 = uvec2 / np.linalg.norm(uvec2)
         else:
             uvec2 = box[3] - box[0]
-            uvec2 = uvec2/ np.linalg.norm(uvec2)
+            uvec2 = uvec2 / np.linalg.norm(uvec2)
 
         self._uvecs = (uvec1, uvec2)
+        scalar_proj = np.dot(np.array([1,0]), uvec1)
+        self._rotAngle = np.arccos(scalar_proj) 
 
-    def get_rot_contours(self):
+        # print rectangle's angle of rotation
+        if self._crot:
+            print(f'Rect\'s angle of rotation is: {self._rotAngle} degrees clockwise')
+        else:
+            print(f'Rect\'s angle of rotation is: {self._rotAngle} anticlockwise degrees')
+        
+
+    def get_rot_img(self):
         """
-            Gets the rotated contours
-            of the object of interest!
+            Get the rotated image 
+            if it exists and its 
+            contour.
         """
-        # Get the unit vectors
-        self.uvec(self._minRectBox)
-        uvec1, uvec2 = self._uvecs
 
-        # init rotated contours variable
-        self._rotCnts = self._contours[0].copy()
+        if not self._rotFlag:
+            # if image is not rotated, skip this function
+            return 
+    
+        image = self._img.copy()
 
-        # Get the transformation matrix
-        self._transMat = np.array([uvec1, uvec2]).T
+        # Get final rotated image if the minimum rectangle is rotated
+        if self._crot:
+            transMat = cv2.getRotationMatrix2D((0,0), np.degrees(self._rotAngle), 1)
+        else:
+            transMat = cv2.getRotationMatrix2D((0,0), np.degrees(-self._rotAngle), 1)
 
-        # Get the rotated contours through linear alg.
-        self._rotCnts = self._rotCnts.T - self._originRot.reshape((2,1))
-        self._rotCnts = np.matmul(np.linalg.inv(self._transMat), self._rotCnts)
-        self._rotCnts = np.intp(self._rotCnts.T)  # convert to integers
+        self._img = cv2.warpAffine(image, transMat,\
+                (image.shape[1], image.shape[0]))
+
+        # detect object 
+        self.detect(self._img)
+
+        # Get contours or segments  
+        self._contours = [] # reinitialize the contours variable
+        self.segment()
+
 
 
 class WidthVar(MinRect):
@@ -203,10 +231,10 @@ class WidthVar(MinRect):
         """
 
         # Get unique y values
-        all_yvals = self._rotCnts[:,1].copy()  # Get all y values in rot contour
+        all_yvals = self._contours[0][:,1].copy()  # Get all y values in contour
         unique_vals, count = np.unique(all_yvals, return_counts=True)
-        min_by = 0  # min. rot. bounding box coord (yaxis)
-        max_by = self._maxyRot  # max. rot. bounding box coord (yaxis)
+        min_by = np.intp(self._center[1] - 0.5 * self._height)  # min. bounding box coord (yaxis)
+        max_by = np.intp(self._center[1] + 0.5 * self._height)  # max. bounding box coord (yaxis)
 
         # Get suitable y values that repeat
         suitable_yval = unique_vals[count > 1]
@@ -216,18 +244,19 @@ class WidthVar(MinRect):
         suitable_yval = suitable_yval[filter]
 
         # Get filter to select x values that correspond to suitable_yval
-        xfilter = np.isin(self._rotCnts[:,1], suitable_yval)
+        xfilter = np.isin(self._contours[0][:,1], suitable_yval)
 
         # Get corresponding x coords to suitable_yval
-        self._suitable_coords = self._rotCnts[xfilter]
+        self._suitable_coords = self._contours[0][xfilter]
 
     def var_width(self):
         prev = 0  # used to track the prev point's y coord drawn on img
         seen = []
+        sep = 25 # determines the separation or spacing for arrowed lines
 
         # Get the varying widths
         for _, yval in self._suitable_coords:
-            if yval - prev < 25:
+            if yval - prev < sep:
                 continue
 
             prev = yval
@@ -237,7 +266,7 @@ class WidthVar(MinRect):
             else:
                 seen.append(yval)
 
-            point = (np.where(self._rotCnts[:,1] == yval))[0]
+            point = (np.where(self._contours[0][:,1] == yval))[0]
             if len(point) == 0:
                 # skip rest of code if nothing is found
                 continue
@@ -245,7 +274,7 @@ class WidthVar(MinRect):
             xmin, xmax = np.inf, 0
 
             for xval_loc in point:
-                xval = self._rotCnts[xval_loc][0]
+                xval = self._contours[0][xval_loc][0]
                 if xval < xmin:
                     xmin = xval
 
@@ -254,36 +283,40 @@ class WidthVar(MinRect):
 
             # Calculate the width and store it
             width = xmax - xmin
+
+            if width < 2:
+                continue # skip small widths 
+
             self._varwidth.append(width)
 
             # Convert the lines to a proper basis and store it
             line = np.array([[xmin, xmax],[yval, yval]])
-            line = np.matmul(self._transMat, line)  # conv. of rot. line to std. basis
-            line = line + self._originRot.reshape((2,1))  # convert line
             self._suitable_line.append(line)
-
 
 class Prosths(WidthVar):
     """
-        This class draws the object contour,
-        bounding box and the varying width
+        This class draws the object contour, 
+        bounding box and the varying width.
     """
 
     def __init__(self, image_path):
         super().__init__(image_path)
 
-    def setup(self):
+    def run(self):
         """
             This method sets up the entire
             detection of human body part,
             segmentation, measurements etc..
         """
-        self.detect()  # detect object
-        self.segment()  # segment object
-        self.get_min_rectBox()  # get min.area Rectangle
-        self.get_rot_contours()  # get rotated contours
-        self.gen_suitable()  # get suitable points/lines
-        self.var_width()  # get all the varying widths
+        self.detect(self._img) # detect object
+        self.segment() # segment object 
+        if self._segment_flag:
+            # show contours and and widths if contour was detected
+            self.get_min_rectBox() # get min.area Rectangle 
+            self.get_rot_img() # get rotated image if min. Rect is rotated 
+            self.gen_suitable() # get suitable points/lines 
+            self.var_width() # get all the varying widths 
+            self.show()
 
     def draw_minrect(self):
         """
@@ -291,7 +324,33 @@ class Prosths(WidthVar):
             on the object to show it has been
             detected
         """
-        cv2.polylines(self._img, [self._minRectBox], True, (0,0,0), 4)
+        cv2.polylines(self._img, [self._minRectBox], True, (255, 0, 0), 4)
+
+    def draw_misc(self):
+        """
+            Draws miscellaneous details
+            helpful to the user
+        """
+        # Get text to write on image
+        text_str = f'Cup: {round(self._prob, 2)}'
+        text_size, _ = cv2.getTextSize(text_str, cv2.FONT_HERSHEY_PLAIN, 1, 2)
+
+        # Height and width of rectangle to write text
+        height_text = text_size[1] + 40 
+        width_text = text_size[0] + 100
+
+        # Get colour to use
+        clr = (255, 0, 0)
+
+        # coords of top left corner of rectangle 
+        x1 = np.intp(self._center[0] - 0.5 * self._width) 
+        y1 = np.intp(self._center[1] - 0.5 * self._height) 
+
+        cv2.rectangle(self._img, (x1, y1-height_text), (x1+width_text,y1), \
+                        clr, -1)
+        cv2.putText(self._img, text_str, (x1+5, y1-20), cv2.FONT_HERSHEY_PLAIN, 2, \
+                    (255, 255, 255), 2)
+
 
     def draw_uvec(self):
         """
@@ -323,6 +382,7 @@ class Prosths(WidthVar):
         contour = self._contours[0]
         cv2.polylines(self._img, [contour], True, (0, 0, 255), 4)
 
+
     def draw_width(self):
         for count in range(len(self._suitable_line)):
             # get coords in standard basis 
@@ -342,7 +402,7 @@ class Prosths(WidthVar):
             
             # Get x and y pos for text 
             x_pos = int(0.5*(x1+x2-text_size[0]))
-            y_pos = int(np.cos(76)*(y1+20))
+            y_pos = int(y1+20)
 
             # Place text underneath arrowed line
             cv2.putText(self._img, text_str, (x_pos, y_pos),\
@@ -353,15 +413,13 @@ class Prosths(WidthVar):
             Shows the image with the detection,
             contour and measurements
         """
-
         self.draw_minrect()  # draw the minimum rectangle
+        self.draw_misc() # draw misc info. 
         self.draw_contours() # draw contour of desired obj
         self.draw_uvec() # draw the unit vectors
         self.draw_width() # draw the varying width of obj 
 
-        if segment:
-            pass
-
+        # show the images 
         cv2.namedWindow("Prosths", cv2.WINDOW_NORMAL)
         cv2.imshow('Prosths', self._img)
         cv2.waitKey(0)
@@ -369,6 +427,5 @@ class Prosths(WidthVar):
 
         
 
-a = Prosths('images/bent-cup.jpg')
-a.setup()
-a.show()
+a = Prosths('images/rot-cup.jpg')
+a.run()
