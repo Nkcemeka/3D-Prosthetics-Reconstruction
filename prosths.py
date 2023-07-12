@@ -131,8 +131,6 @@ class MinRect(Dseg):
         # Get width and height of rectangle
         box = self._minRectBox.copy()
         box = box[box[:,1].argsort()]  # sort the box array
-        self._width = np.linalg.norm(box[1] - box[0])
-        self._height = np.linalg.norm(box[3] - box[0])
 
         # Get the unit vectors
         self.uvec(self._minRectBox)
@@ -155,37 +153,72 @@ class MinRect(Dseg):
 
         box = box.copy()
         box = box[box[:,1].argsort()]  # sort the box array
-        flip = False  # used to set origin as top left corner
+        
+        # Get the width of the rectangle 
+        self._width = np.linalg.norm(box[1] - box[0])
 
         # Get unit vectors for min. rect
-        if box[1][0] < box[0][0]:  # rect is rot. left
-            box = -1 * box  # mult. by -1 to get uvec in right dirxns
-            flip = True
-            self._crot = False  # rectangle was not rotated clockwise 
+        if box[1][1] != box[0][1]:
+            if box[1][0] < box[0][0]: 
+                self._crot = False  # rectangle was not rotated clockwise 
+                uvec1 = box[0] - box[1]
+                uvec2 = box[3] - box[1]
+                self._height = np.linalg.norm(uvec2)
+            else:
+                self._crot = True # rectangle was rotated clockwise 
+                uvec1 = box[1] - box[0]
+                uvec2 = box[2] - box[0]
+                self._height = np.linalg.norm(uvec2)
         else:
-            self._crot = True # rectangle was rotated clockwise 
+            if box[1][0] > box[0][0]:
+                # box0 is the origin
+                uvec1 = box[1] - box[0]
+                if box[3][0] > box[2][0]:
+                    # box 2 is on the side of box0 
+                    uvec2 = box[2] - box[0] 
+                    self._height = np.linalg.norm(uvec2)
+                else:
+                    # box3 is on the side of box0
+                    uvec2 = box[3] - box[0]
+                    self._height = np.linalg.norm(uvec2)
+            else:
+                # box1 is the origin 
+                uvec1 = box[0] - box[1] 
+                if box[3][0] > box[2][0]:
+                    # box2 is on the side of box1 
+                    uvec2 = box[2] - box[1]
+                    self._height = np.linalg.norm(uvec2)
+                else:
+                    # box3 is on the side of box1 
+                    uvec2 = box[3] - box[1]
+                    self._height = np.linalg.norm(uvec2)
 
         # Get the first unit vector
-        uvec1 = box[1] - box[0]
         uvec1 = uvec1 / np.linalg.norm(uvec1)
 
         # Get the second unit vector
-        if flip:
-            uvec2 = -box[3] + box[1]  # done since box was mult. by -1
-            uvec2 = uvec2 / np.linalg.norm(uvec2)
-        else:
-            uvec2 = box[3] - box[0]
-            uvec2 = uvec2 / np.linalg.norm(uvec2)
+        uvec2 = uvec2 / np.linalg.norm(uvec2)
 
         self._uvecs = (uvec1, uvec2)
         scalar_proj = np.dot(np.array([1,0]), uvec1)
         self._rotAngle = np.arccos(scalar_proj) 
 
         # print rectangle's angle of rotation
-        if self._crot:
+        if self._crot is None:
+            print(f'Rect\'s angle of rotation is: 0 degrees')
+        elif self._crot:
             print(f'Rect\'s angle of rotation is: {self._rotAngle} degrees clockwise')
         else:
             print(f'Rect\'s angle of rotation is: {self._rotAngle} anticlockwise degrees')
+
+
+    def get_rect_size(self):
+        """
+            Get the dimension of the 
+            min. area rect. 
+        """
+        self._width = np.linalg.norm(box[1] - box[0])
+        self._height = np.linalg.norm(box[3] - box[0])
         
 
     def get_rot_img(self):
@@ -216,7 +249,6 @@ class MinRect(Dseg):
         # Get contours or segments  
         self._contours = [] # reinitialize the contours variable
         self.segment()
-
 
 
 class WidthVar(MinRect):
@@ -432,5 +464,5 @@ class Prosths(WidthVar):
 
         
 
-a = Prosths('images/cup5.jpg')
+a = Prosths('images/cup1.png')
 a.run()
