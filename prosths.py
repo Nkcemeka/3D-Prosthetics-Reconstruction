@@ -209,17 +209,7 @@ class MinRect(Dseg):
         elif self._crot:
             print(f'Rect\'s angle of rotation is: {self._rotAngle} degrees clockwise')
         else:
-            print(f'Rect\'s angle of rotation is: {self._rotAngle} anticlockwise degrees')
-
-
-    def get_rect_size(self):
-        """
-            Get the dimension of the 
-            min. area rect. 
-        """
-        self._width = np.linalg.norm(box[1] - box[0])
-        self._height = np.linalg.norm(box[3] - box[0])
-        
+            print(f'Rect\'s angle of rotation is: {self._rotAngle} anticlockwise degrees')        
 
     def get_rot_img(self):
         """
