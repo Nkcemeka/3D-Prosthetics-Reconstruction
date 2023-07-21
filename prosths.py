@@ -110,6 +110,8 @@ class MinRect(Dseg):
         self._height = None 
         self._center = None 
         self._crot = None 
+        self._leftCnt = None 
+        self._rightCnt = None 
 
     def get_min_rectBox(self):
         """
@@ -240,6 +242,19 @@ class MinRect(Dseg):
         self._contours = [] # reinitialize the contours variable
         self.segment()
 
+    def get_contour_halves(self):
+        """
+            Used to get contour get contour 
+            halves after a contour has been 
+            found!
+        """
+        x_thresh = self._center[0]
+        left_half = self._contours[0][self._contours[0][:,0] < x_thresh]
+        right_half = self._contours[0][self._contours[0][:,0] >= x_thresh]
+
+        # sort the left and right contours based on y value
+        self._leftCnt = left_half[left_half[:,1].argsort()]
+        self._rightCnt = right_half[right_half[:,1].argsort()]
 
 class WidthVar(MinRect):
     """
@@ -252,75 +267,57 @@ class WidthVar(MinRect):
         self._suitable_coords = None
         self._suitable_line = []
         self._varwidth = []
+    
+    def get_var_width(self):
+        prev = 0
+        sep = 25
+        for cnt in self._leftCnt:
+            yval = cnt[1] 
 
-    def gen_suitable(self):
-        """
-            Generates the proper set of coords
-            which we can join with a line.
-        """
-
-        # Get unique y values
-        all_yvals = self._contours[0][:,1].copy()  # Get all y values in contour
-        unique_vals, count = np.unique(all_yvals, return_counts=True)
-        min_by = np.intp(self._center[1] - 0.5 * self._height)  # min. bounding box coord (yaxis)
-        max_by = np.intp(self._center[1] + 0.5 * self._height)  # max. bounding box coord (yaxis)
-
-        # Get suitable y values that repeat
-        suitable_yval = unique_vals[count > 1]
-
-        # filter suitable_yval to select values between min_by and max_by
-        filter = (np.where((suitable_yval >= min_by) & (suitable_yval <= max_by)))[0]
-        suitable_yval = suitable_yval[filter]
-
-        # Get filter to select x values that correspond to suitable_yval
-        xfilter = np.isin(self._contours[0][:,1], suitable_yval)
-
-        # Get corresponding x coords to suitable_yval
-        self._suitable_coords = self._contours[0][xfilter]
-
-    def var_width(self):
-        prev = 0  # used to track the prev point's y coord drawn on img
-        seen = []
-        sep = 25 # determines the separation or spacing for arrowed lines
-
-        # Get the varying widths
-        for _, yval in self._suitable_coords:
-            if yval - prev < sep:
+            if yval-prev < sep:
                 continue
 
             prev = yval
 
-            if yval in seen:
-                continue
+            loc = np.searchsorted(self._rightCnt[:,1], yval)
+            if self._rightCnt[:,1][loc] == yval:
+                xmin = cnt[0]
+                xmax = self._rightCnt[:, 0][loc]
+                line = np.array([[xmin, xmax],[yval, yval]])
+                width = xmax - xmin
+                self._varwidth.append(width)
+                self._suitable_line.append(line)
             else:
-                seen.append(yval)
+                xmin = cnt[0]
+                xmax = self.lin_interp(loc, yval)
+                line = np.array([[xmin, xmax], [yval, yval]])
+                width = xmax - xmin
+                self._varwidth.append(width)
+                self._suitable_line.append(line)
 
-            point = (np.where(self._contours[0][:,1] == yval))[0]
-            if len(point) == 0:
-                # skip rest of code if nothing is found
-                continue
+    def lin_interp(self, loc, yn):
+        """
+            Performs a linear interpolation
+            to get a missing x value due to
+            effects of integer approx.
+        """
+        if (loc-1) != 0:
+            x1 = self._rightCnt[:, 0][loc-1]
+            x2 = self._rightCnt[:, 0][loc]
+            y1 = self._rightCnt[:, 1][loc-1]
+            y2 = self._rightCnt[:,1][loc]
+        else:
+            x2 = self._rightCnt[:, 0][loc]
+            y2 = self._rightCnt[:, 1][loc]
+            x1 = x2 
+            y1 = y2 - 1 
 
-            xmin, xmax = np.inf, 0
-
-            for xval_loc in point:
-                xval = self._contours[0][xval_loc][0]
-                if xval < xmin:
-                    xmin = xval
-
-                if xval > xmax:
-                    xmax = xval
-
-            # Calculate the width and store it
-            width = xmax - xmin
-
-            if width < 2:
-                continue # skip small widths 
-
-            self._varwidth.append(width)
-
-            # Convert the lines to a proper basis and store it
-            line = np.array([[xmin, xmax],[yval, yval]])
-            self._suitable_line.append(line)
+        if x1 == x2:
+            m = (y2-y1) # to prevent div. by zero
+        else:
+            m = (y2-y1)/(x2 - x1)
+        xn = x1 + (yn - y1)/m
+        return xn
 
 class Prosths(WidthVar):
     """
@@ -341,8 +338,8 @@ class Prosths(WidthVar):
         self.segment() # segment object 
         self.get_min_rectBox() # get min.area Rectangle 
         self.get_rot_img() # get rotated image if min. Rect is rotated 
-        self.gen_suitable() # get suitable points/lines 
-        self.var_width() # get all the varying widths 
+        self.get_contour_halves()
+        self.get_var_width()
         self.show()
 
     def draw_minrect(self):
@@ -454,5 +451,5 @@ class Prosths(WidthVar):
 
         
 
-a = Prosths('images/cup1.png')
+a = Prosths('images/cup4.jpg')
 a.run()
