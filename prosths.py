@@ -326,8 +326,9 @@ class Prosths(WidthVar):
         bounding box and the varying width.
     """
 
-    def __init__(self, image_path):
+    def __init__(self, image_path, flip_contour):
         super().__init__(image_path)
+        self._flip_cnt = flip_contour
 
     def run(self):
         """
@@ -452,12 +453,23 @@ class Prosths(WidthVar):
         cv2.destroyAllWindows()
 
     def save_contours(self):
-        contour = self._contours[0]
-        x_coord = contour[:,0]
-        y_coord = contour[:,1]
+        contours = self._contours[0]
+        x_coord = contours[:,0]
+
+        # Flip contour if it is not rightside up in 
+        # CAD software
+        if self._flip_cnt:
+            y_coord = -1*contours[:,1]
+        else:
+            y_coord = contours[:,1]
         contour_frame = pd.DataFrame({'x':x_coord, 'y':y_coord})
         contour_frame.to_csv("contours.csv",index=False)
         
 
-a = Prosths('images/cup4.jpg')
-a.run()
+# Read Cmd Arguments
+img_path = sys.argv[1] # image path
+flip_cnt = int(sys.argv[2]) # Determines if contour should be flipped 
+
+# Create Prosthetics object and run it
+Prosths_obj = Prosths(img_path, flip_cnt)
+Prosths_obj.run()
