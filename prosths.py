@@ -12,6 +12,7 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import sys
+import pandas as pd
 
 class Dseg():
 
@@ -341,6 +342,7 @@ class Prosths(WidthVar):
         self.get_contour_halves()
         self.get_var_width()
         self.show()
+        self.save_contours()
 
     def draw_minrect(self):
         """
@@ -449,6 +451,12 @@ class Prosths(WidthVar):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+    def save_contours(self):
+        contour = self._contours[0]
+        x_coord = contour[:,0]
+        y_coord = contour[:,1]
+        contour_frame = pd.DataFrame({'x':x_coord, 'y':y_coord})
+        contour_frame.to_csv("contours.csv",index=False)
         
 
 a = Prosths('images/cup4.jpg')
