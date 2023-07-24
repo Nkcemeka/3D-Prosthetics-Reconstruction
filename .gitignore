@@ -1,2 +1,4 @@
 # Ignore the downloaded model
 yolov8m-seg.pt
+contours.csv
+obj_contour.dxf
