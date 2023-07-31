@@ -1,6 +1,6 @@
 """
 Project Author: Chukwuemeka L. Nkama
-Date: July 5, 2021
+Date: July 5, 2023
 
 prosths.py is a python file that contains helper classes
 and methods for object detection and segmentation of human
@@ -37,6 +37,7 @@ class Dseg():
         self._obj_id = 41  # object id in model
         self._contours = []
         self._prob = None 
+        self._initRotFlag = False
 
     def detect(self, image):
         """
@@ -206,6 +207,11 @@ class MinRect(Dseg):
         scalar_proj = np.dot(np.array([1,0]), uvec1)
         self._rotAngle = np.arccos(scalar_proj) 
 
+
+        if self._initRotFlag:
+            # Avoid unnecesary printouts to console
+            return
+
         # print rectangle's angle of rotation
         if self._crot is None:
             print(f'Rect\'s angle of rotation is: 0 degrees')
@@ -213,6 +219,9 @@ class MinRect(Dseg):
             print(f'Rect\'s angle of rotation is: {self._rotAngle} degrees clockwise')
         else:
             print(f'Rect\'s angle of rotation is: {self._rotAngle} anticlockwise degrees')        
+
+        self._initRotFlag = True # Means initial angle of rot. has been determined
+
 
     def get_rot_img(self):
         """
@@ -338,7 +347,6 @@ class Prosths(WidthVar):
         """
         self.detect(self._img) # detect object
         self.segment() # segment object 
-        self.get_min_rectBox() # get min.area Rectangle 
         self.get_rot_img() # get rotated image if min. Rect is rotated 
         self.get_contour_halves()
         self.get_var_width()
