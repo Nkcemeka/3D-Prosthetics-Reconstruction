@@ -5,5 +5,5 @@ Rather than trying to make 3d reconstrution techniques work, this project aims t
 1. This project uses deep learning as image processing techniques are too simple to be effective. 
 2. It is hard to tell if this method will work but we will see as time goes.
 3. Some things are hard-coded into the bash script. So, if you want to change things a bit, go through it.
-4. The bash script, run.sh, prints a USAGE doc when you try to run it.
-5. run.sh allows you to pass an optional argument (0 or 1) to flip the orientation of the contour in your CAD software.
+4. run.sh allows you to pass an optional argument (0 or 1) to flip the orientation of the contour in your CAD software.
+4. height.sh allows user to find height between lines
