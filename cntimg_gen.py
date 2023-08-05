@@ -50,8 +50,8 @@ cnts = cnts.iloc[:,:].to_numpy()
 cnts = np.intp(cnts)
 min_x = np.min(cnts[:,0]) # get min. x
 max_x = np.max(cnts[:,0]) # get max. x
-min_y = np.min(cnts[:,0]) # get min. y
-max_y = np.max(cnts[:,0]) # get max. y
+min_y = np.min(cnts[:,1]) # get min. y
+max_y = np.max(cnts[:,1]) # get max. y
 
 # Get the suitable x coords and y coords
 x_suit = (np.arange(img.shape[1]) >= min_x) & (np.arange(img.shape[1]) <= max_x)
