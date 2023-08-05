@@ -25,5 +25,5 @@ flip_cnt="${2:-0}" # flip contour for CAD viewing (0 is False)
 python3 prosths.py "$img_path" "$flip_cnt" 
 
 # Generate the contours also
-python3 dxf_writer.py contours.csv obj_contour
+python3 .dxf_writer.py .contours.csv obj_contour
 
