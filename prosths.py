@@ -470,7 +470,7 @@ class Prosths(WidthVar):
         # save line_height_frame to csv file
         line_height_frame.to_csv('line_height.csv', index=False)
 
-    def show(self, segment=False):
+    def show(self):
         """
             Shows the image with the detection,
             contour and measurements
@@ -486,6 +486,10 @@ class Prosths(WidthVar):
         cv2.imshow('Prosths', self._img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+        # save the file for the CAD user to get necessary info w/out
+        # running the program again
+        cv2.imwrite('final_img.jpg',self._img)
 
     def save_contours(self):
         contours = self._contours[0]
