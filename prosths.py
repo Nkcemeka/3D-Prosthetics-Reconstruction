@@ -215,13 +215,24 @@ class MinRect(Dseg):
         # print rectangle's angle of rotation
         if self._crot is None:
             print(f'Rect\'s angle of rotation is: 0 degrees')
+            rot = '0n'
         elif self._crot:
             print(f'Rect\'s angle of rotation is: {self._rotAngle} degrees clockwise')
+            rot = f'{self._rotAngle}cw'
         else:
             print(f'Rect\'s angle of rotation is: {self._rotAngle} anticlockwise degrees')        
+            rot = f'{self._rotAngle}acw'
 
         self._initRotFlag = True # Means initial angle of rot. has been determined
+        self.gen_rot_info(rot)
 
+    def gen_rot_info(self, rot):
+        """
+            Stores the rotation info
+            in a file.
+        """
+        with open("rotinfo.txt", 'w') as filewriter:
+            filewriter.write(f'{rot}')
 
     def get_rot_img(self):
         """
@@ -470,8 +481,11 @@ class Prosths(WidthVar):
             y_coord = -1*contours[:,1]
         else:
             y_coord = contours[:,1]
-        contour_frame = pd.DataFrame({'x':x_coord, 'y':y_coord})
-        contour_frame.to_csv("contours.csv",index=False)
+        
+        # contours[:,1] is to prevent unnecessary errors in other
+        # code files.
+        contour_frame = pd.DataFrame({'x':x_coord, 'y':contours[:,1]}) 
+        contour_frame.to_csv(".contours.csv",index=False)
         
 
 # Read Cmd Arguments
