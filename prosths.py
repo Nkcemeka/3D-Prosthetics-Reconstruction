@@ -349,6 +349,7 @@ class Prosths(WidthVar):
     def __init__(self, image_path, flip_contour):
         super().__init__(image_path)
         self._flip_cnt = flip_contour
+        self._line_heights = {}
 
     def run(self):
         """
@@ -430,6 +431,9 @@ class Prosths(WidthVar):
 
 
     def draw_width(self):
+        id = 1 # Id is used to know the identity of the line we measure
+        id_list = list(range(1, len(self._suitable_line)+1))
+        y_list = [] # add y1 values since we didn't linearly interpolate the left half
         for count in range(len(self._suitable_line)):
             # get coords in standard basis 
             x1, x2 = self._suitable_line[count][0].astype(np.intp)
@@ -443,9 +447,13 @@ class Prosths(WidthVar):
 
             # Get width and create text 
             width = self._varwidth[count]
-            text_str = f'Width: {width}'
+            text_str = f'Width ({id}): {round(width, 2)}'
             text_size, _ = cv2.getTextSize(text_str, cv2.FONT_HERSHEY_PLAIN, 1, 2)
-            
+            id += 1
+
+            # Add y1 vals
+            y_list.append(y1)
+
             # Get x and y pos for text 
             x_pos = int(0.5*(x1+x2-text_size[0]))
             y_pos = int(y1+20)
@@ -453,6 +461,14 @@ class Prosths(WidthVar):
             # Place text underneath arrowed line
             cv2.putText(self._img, text_str, (x_pos, y_pos),\
                          cv2.FONT_HERSHEY_PLAIN, 1, (0,0,0), 2)
+
+        # Add id and y values to _line_heights
+        self._line_heights['id'] = id_list
+        self._line_heights['y values'] = y_list
+        line_height_frame = pd.DataFrame(self._line_heights)
+
+        # save line_height_frame to csv file
+        line_height_frame.to_csv('line_height.csv', index=False)
 
     def show(self, segment=False):
         """
