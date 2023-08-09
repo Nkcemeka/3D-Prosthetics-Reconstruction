@@ -32,7 +32,7 @@ if [ ! -f "$img_path" ]; then
 fi
 
 # Check if inputted number is correct
-if ! [ "$flip_cnt" -eq 0] || ! ["$flip_cnt" -eq 1]; then
+if ! [ "$flip_cnt" -eq 0 ] && ! [ "$flip_cnt" -eq 1 ]; then
   echo "Wrong integer passed; Input 0 or 1"
   exit 1
 fi
