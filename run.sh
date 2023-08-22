@@ -37,9 +37,22 @@ if ! [ "$flip_cnt" -eq 0 ] && ! [ "$flip_cnt" -eq 1 ]; then
   exit 1
 fi
 
+# Check if python or python3 is available
+# NOTE: Both aliases might work on Windows but not 
+# necessarily on Linux
+
+if command -v python &>/dev/null; then
+  PYTHON=python
+elif command -v python3 &>/dev/null; then
+  PYTHON=python3
+else
+  echo "Python not found! Install or add to PATH!"
+  exit 1
+fi
+
 # Run the Prosths file
-python3 prosths.py "$img_path" "$flip_cnt" 
+$PYTHON prosths.py "$img_path" "$flip_cnt" 
 
 # Generate the contours also
-python3 .dxf_writer.py .contours.csv obj_contour
+$PYTHON .dxf_writer.py .contours.csv obj_contour
 
